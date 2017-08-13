@@ -40,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
             mButtonGpio.registerGpioCallback(mCallback);
         } catch (IOException e) {
             Log.e(TAG, "Error on PeripheralIO API ", e);
-            Log.e(TAG, "Error on PeripheralIO API ", e);
+
         }
 
     }
