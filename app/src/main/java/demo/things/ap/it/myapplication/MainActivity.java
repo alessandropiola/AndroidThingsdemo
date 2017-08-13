@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public boolean onGpioEdge(Gpio gpio) {
             Log.i(TAG, "GPIO changed, button pressed");
-            testobtn1.setText("pulsante Premuto.");
+            testobtn1.setText("pulsante Premuto..");
 
 
             // Step 5. Return true to keep callback active.
