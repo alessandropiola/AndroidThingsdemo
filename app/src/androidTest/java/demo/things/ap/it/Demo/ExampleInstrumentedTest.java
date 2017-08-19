@@ -1,4 +1,4 @@
-package demo.things.ap.it.myapplication;
+package demo.things.ap.it.Demo;
 
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;

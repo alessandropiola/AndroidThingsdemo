@@ -4,7 +4,7 @@ android {
     compileSdkVersion 26
     buildToolsVersion "26.0.1"
     defaultConfig {
-        applicationId "demo.things.ap.it.myapplication"
+        applicationId "demo.things.ap.it.Demo"
         minSdkVersion 24
         targetSdkVersion 26
         versionCode 1
@@ -26,7 +26,7 @@ dependencies {
     })
     compile 'com.android.support:appcompat-v7:26.+'
     provided 'com.google.android.things:androidthings:0.5-devpreview'
-
+    compile 'com.google.android.things.contrib:driver-ssd1306:0.4'
 
     compile 'com.android.support.constraint:constraint-layout:1.0.1'
     testCompile 'junit:junit:4.12'

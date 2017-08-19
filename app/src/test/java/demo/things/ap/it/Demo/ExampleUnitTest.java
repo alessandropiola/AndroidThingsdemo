@@ -1,4 +1,4 @@
-package demo.things.ap.it.myapplication;
+package demo.things.ap.it.Demo;
 
 import org.junit.Test;
 
