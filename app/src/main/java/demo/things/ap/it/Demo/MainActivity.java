@@ -1,5 +1,11 @@
 package demo.things.ap.it.Demo;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -78,8 +84,37 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
-    }
+        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (mBluetoothAdapter != null) {
+            // Device does not support Bluetooth
+            Log.i(TAG, "BT is on board ");
+        }
+        if (!mBluetoothAdapter.isEnabled()) {
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, 1001);
+        } else {
+            Log.i(TAG, "BT is ok ");
 
+        }
+        // Register for broadcasts when a device is discovered.
+        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        registerReceiver(mReceiver, filter);
+
+
+    }
+    // Create a BroadcastReceiver for ACTION_FOUND.
+    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                // Discovery has found a device. Get the BluetoothDevice
+                // object and its info from the Intent.
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                String deviceName = device.getName();
+                String deviceHardwareAddress = device.getAddress(); // MAC address
+            }
+        }
+    };
     // Step 4. Register an event callback.
     private GpioCallback mCallback = new GpioCallback() {
         @Override
@@ -97,45 +132,6 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
 
         try {
-       /*     int ii = 0;
-            Led72xx.setRow(ii,7,(byte) 0b10000000);
-            Led72xx.setRow(ii,6,(byte) 0b11000000);
-            Led72xx.setRow(ii,5,(byte) 0b11100000);
-            Led72xx.setRow(ii,4,(byte) 0b11110000);
-            Led72xx.setRow(ii,3,(byte) 0b11111000);
-            Led72xx.setRow(ii,2,(byte) 0b11000000);
-            Led72xx.setRow(ii,1,(byte) 0b11000000);
-            Led72xx.setRow(ii,0,(byte) 0b11000000);
-
-            ii = 1;
-            Led72xx.setRow(ii,7,(byte) 0b00000011);
-            Led72xx.setRow(ii,6,(byte) 0b00000011);
-            Led72xx.setRow(ii,5,(byte) 0b00000011);
-            Led72xx.setRow(ii,4,(byte) 0b00000011);
-            Led72xx.setRow(ii,3,(byte) 0b00000011);
-            Led72xx.setRow(ii,2,(byte) 0b00000011);
-            Led72xx.setRow(ii,1,(byte) 0b00000011);
-            Led72xx.setRow(ii,0,(byte) 0b00000011);
-
-            ii = 4;
-            Led72xx.setRow(ii,7,(byte) 0b11000000);
-            Led72xx.setRow(ii,6,(byte) 0b11000000);
-            Led72xx.setRow(ii,5,(byte) 0b11000000);
-            Led72xx.setRow(ii,4,(byte) 0b11000000);
-            Led72xx.setRow(ii,3,(byte) 0b11000000);
-            Led72xx.setRow(ii,2,(byte) 0b11000000);
-            Led72xx.setRow(ii,1,(byte) 0b11111100);
-            Led72xx.setRow(ii,0,(byte) 0b11111100);
-
-            ii = 5;
-            Led72xx.setRow(ii,7,(byte) 0b00000011);
-            Led72xx.setRow(ii,6,(byte) 0b00000011);
-            Led72xx.setRow(ii,5,(byte) 0b00000011);
-            Led72xx.setRow(ii,4,(byte) 0b00000011);
-            Led72xx.setRow(ii,3,(byte) 0b00000011);
-            Led72xx.setRow(ii,2,(byte) 0b00000011);
-            Led72xx.setRow(ii,1,(byte) 0b00111111);
-            Led72xx.setRow(ii,0,(byte) 0b00111111);*/
 
         byte[] frame = numbers.num1;
 
@@ -176,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
             Log.e(TAG, "Error initializing LED matrix", e);
         }
+
 
     }
     @Override
