@@ -5,21 +5,29 @@ import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.os.Handler;
-import android.support.v7.app.AppCompatActivity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
+import android.support.annotation.NonNull;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.google.android.things.contrib.driver.ssd1306.Ssd1306;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.GpioCallback;
-import demo.things.ap.it.Demo.Led72xx;
 import com.google.android.things.pio.PeripheralManagerService;
+import com.google.firebase.storage.FileDownloadTask;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
+import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
+import java.io.UnsupportedEncodingException;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "HomeActivity";
@@ -28,13 +36,16 @@ public class MainActivity extends AppCompatActivity {
     private Gpio mButtonGpio;
     TextView testobtn1;
 
-    Led72xx Led72xx;
+    Led72xx Led;
 
+    TextToSpeech t1;
 
+    FirebaseStorage storage ;
+    StorageReference storageRef ;
 
 // Access the display:
 
-    private Ssd1306 mScreen;
+    private BluetoothAdapter mBluetoothAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,12 +53,24 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         testobtn1 = (TextView) findViewById(R.id.textView);
 
+        // Create a storage reference from our app
+        storage = FirebaseStorage.getInstance();
+        storageRef = storage.getReference();
 
         PeripheralManagerService service = new PeripheralManagerService();
-        Log.d(TAG, "Available GPIO: " + service.getGpioList());
-        Log.d(TAG, "Available GPIO: " + service.getI2cBusList());
-        Log.d(TAG, "Available GPIO: " + service.getI2sDeviceList());
-        Log.d(TAG, "Available GPIO: " + service.getSpiBusList());
+
+
+        t1=new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if(status != TextToSpeech.ERROR) {
+                    Log.d(TAG, "tts ok");
+                    t1.setLanguage(Locale.ITALIAN);
+                }
+            }
+        });
+
+        //t1.speak("ciao", TextToSpeech.QUEUE_FLUSH, null,null);
 
 
 
@@ -56,11 +79,11 @@ public class MainActivity extends AppCompatActivity {
 
 
         try {
-            Led72xx = new Led72xx("SPI0.0", 8);
-            for (int i = 0; i < Led72xx.getDeviceCount(); i++) {
-                Led72xx.setIntensity(i, 13);
-                Led72xx.shutdown(i, false);
-                Led72xx.clearDisplay(i);
+            Led = new Led72xx("SPI0.0", 8);
+            for (int i = 0; i < Led.getDeviceCount(); i++) {
+                Led.setIntensity(i, 13);
+                Led.shutdown(i, false);
+                Led.clearDisplay(i);
             }
         } catch (IOException e) {
         Log.e(TAG, "Error initializing LED matrix", e);
@@ -83,22 +106,35 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "Error on PeripheralIO API ", e);
 
         }
-
-        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+/*
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBluetoothAdapter != null) {
             // Device does not support Bluetooth
             Log.i(TAG, "BT is on board ");
         }
+        mBluetoothAdapter.enable();
         if (!mBluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBtIntent, 1001);
+            startActivityForResult(enableBtIntent, 101);
         } else {
             Log.i(TAG, "BT is ok ");
 
         }
+        Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
+
+        if (pairedDevices.size() > 0) {
+            // There are paired devices. Get the name and address of each paired device.
+            for (BluetoothDevice device : pairedDevices) {
+                String deviceName = device.getName();
+                String deviceHardwareAddress = device.getAddress(); // MAC address
+                Log.i(TAG, "Bonded: "+deviceName);
+                t1.speak("Bonded", TextToSpeech.QUEUE_FLUSH, null,null);
+            }
+        }*/
+
         // Register for broadcasts when a device is discovered.
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-        registerReceiver(mReceiver, filter);
+        //IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+        //registerReceiver(mReceiver, filter);
 
 
     }
@@ -112,6 +148,18 @@ public class MainActivity extends AppCompatActivity {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 String deviceName = device.getName();
                 String deviceHardwareAddress = device.getAddress(); // MAC address
+                Log.i("TAG bt",deviceName+" "+deviceHardwareAddress);
+
+                device = mBluetoothAdapter.getRemoteDevice("58:56:09:47:17:D0");
+                String pin = "000";
+                try {
+                    device.setPin(pin.getBytes("UTF8"));
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+                device.createBond();
+                t1.speak("ciao ho fatto il paring", TextToSpeech.QUEUE_FLUSH, null,null);
+
             }
         }
     };
@@ -121,6 +169,85 @@ public class MainActivity extends AppCompatActivity {
         public boolean onGpioEdge(Gpio gpio) {
             Log.i(TAG, "GPIO changed, button pressed.");
             testobtn1.setText("pulsante Premuto...");
+            t1.speak("Tasto premuto", TextToSpeech.QUEUE_FLUSH, null,null);
+
+            try {
+
+                int ii = 2;
+
+                Led.setRow(ii,7,(byte) 0b11000000);
+                Led.setRow(ii,6,(byte) 0b11000000);
+                Led.setRow(ii,5,(byte) 0b10000000);
+                Led.setRow(ii,4,(byte) 0b10000000);
+                Led.setRow(ii,3,(byte) 0b00000000);
+                Led.setRow(ii,2,(byte) 0b00000000);
+                Led.setRow(ii,1,(byte) 0b00000000);
+                Led.setRow(ii,0,(byte) 0b00000000);
+                ii = 3;
+
+                Led.setRow(ii,7,(byte) 0b00000011);
+                Led.setRow(ii,6,(byte) 0b00000011);
+                Led.setRow(ii,5,(byte) 0b00000111);
+                Led.setRow(ii,4,(byte) 0b00000111);
+                Led.setRow(ii,3,(byte) 0b00001111);
+                Led.setRow(ii,2,(byte) 0b00001111);
+                Led.setRow(ii,1,(byte) 0b00011110);
+                Led.setRow(ii,0,(byte) 0b00011110);
+                ii = 6;
+
+                Led.setRow(ii,7,(byte) 0b00000000);
+                Led.setRow(ii,6,(byte) 0b00000000);
+                Led.setRow(ii,5,(byte) 0b10000000);
+                Led.setRow(ii,4,(byte) 0b10000000);
+                Led.setRow(ii,3,(byte) 0b11000000);
+                Led.setRow(ii,2,(byte) 0b11000000);
+                Led.setRow(ii,1,(byte) 0b11111110);
+                Led.setRow(ii,0,(byte) 0b11111110);
+                ii = 7;
+
+                Led.setRow(ii,7,(byte) 0b00001111);
+                Led.setRow(ii,6,(byte) 0b00001111);
+                Led.setRow(ii,5,(byte) 0b00000111);
+                Led.setRow(ii,4,(byte) 0b00000111);
+                Led.setRow(ii,3,(byte) 0b00000011);
+                Led.setRow(ii,2,(byte) 0b00000011);
+                Led.setRow(ii,1,(byte) 0b01111111);
+                Led.setRow(ii,0,(byte) 0b01111111);
+
+            } catch (IOException e) {
+                Log.e(TAG, "Error on PeripheralIO API ", e);
+
+         }
+
+
+            final StorageReference islandRef = storageRef.child("images/11.jpg");
+
+            File localFile = null;
+            try {
+                localFile = File.createTempFile("images", "jpg");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            final File finalLocalFile = localFile;
+            islandRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                @Override
+                public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+                    // Local temp file has been created
+                    ImageView click = (ImageView)findViewById(R.id.imageView2);
+                    Bitmap image = BitmapFactory.decodeFile(finalLocalFile.getAbsolutePath());
+
+
+                    click.setImageBitmap(image);
+                    Log.i(TAG, "dwn ok"+islandRef.toString());
+                }
+            }).addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception exception) {
+                    // Handle any errors
+                    Log.e(TAG, "dwn err");
+                }
+            });
 
 
             // Step 5. Return true to keep callback active.
@@ -153,26 +280,17 @@ public class MainActivity extends AppCompatActivity {
             }
 
 
-            Led72xx.setRow(device, rowp, frame[row]);
+            Led.setRow(device, rowp, frame[row]);
         }
 
-            //Android Design
-            int ii = 7;
-            Led72xx.setRow(ii,7,(byte) 0b01000010);
-            Led72xx.setRow(ii,6,(byte) 0b00100100);
-            Led72xx.setRow(ii,5,(byte) 0b01111110);
-            Led72xx.setRow(ii,4,(byte) 0b01011010);
-            Led72xx.setRow(ii,3,(byte) 0b01111110);
-            Led72xx.setRow(ii,2,(byte) 0b00000000);
-            Led72xx.setRow(ii,1,(byte) 0b01111110);
-            Led72xx.setRow(ii,0,(byte) 0b00000000);
+
 
 
 
             } catch (IOException e) {
             Log.e(TAG, "Error initializing LED matrix", e);
         }
-
+       // mBluetoothAdapter.startDiscovery();
 
     }
     @Override
@@ -188,6 +306,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "Error on PeripheralIO API", e);
             }
         }
+        unregisterReceiver(mReceiver);
     }
 
 

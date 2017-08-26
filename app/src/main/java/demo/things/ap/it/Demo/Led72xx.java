@@ -8,6 +8,7 @@ package demo.things.ap.it.Demo;
 
         import android.graphics.Bitmap;
         import android.graphics.Color;
+        import android.util.Log;
 
         import com.google.android.things.pio.PeripheralManagerService;
         import com.google.android.things.pio.SpiDevice;
@@ -98,6 +99,7 @@ public class Led72xx implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
+        Log.w("LB LED","error io");
         try {
             spiDevice.close();
         } finally {
