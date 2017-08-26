@@ -15,6 +15,8 @@ package demo.things.ap.it.Demo;
 
         import java.io.IOException;
 
+        import static com.google.android.gms.internal.zzs.TAG;
+
 /**
  * Port of Arduino's LedControl library
  */
@@ -74,26 +76,32 @@ public class Led72xx implements AutoCloseable {
     /* The maximum number of devices we use */
     private int maxDevices;
 
-    public Led72xx(String spiGpio, int numDevices) throws IOException {
-        PeripheralManagerService pioService = new PeripheralManagerService();
-        spiDevice = pioService.openSpiDevice(spiGpio);
-        spiDevice.setMode(SpiDevice.MODE0);
-        spiDevice.setFrequency(1000000); // 1MHz
-        spiDevice.setBitsPerWord(8); // 8 BPW
-        spiDevice.setBitJustification(false); // MSB first
+    public Led72xx(String spiGpio, int numDevices) {
+        try {
 
-        maxDevices = numDevices;
-        if (numDevices < 1 || numDevices > 8) {
-            maxDevices = 8;
-        }
+            PeripheralManagerService pioService = new PeripheralManagerService();
+            spiDevice = pioService.openSpiDevice(spiGpio);
+            spiDevice.setMode(SpiDevice.MODE0);
+            spiDevice.setFrequency(1000000); // 1MHz
+            spiDevice.setBitsPerWord(8); // 8 BPW
+            spiDevice.setBitJustification(false); // MSB first
 
-        for (int i = 0; i < maxDevices; i++) {
-            spiTransfer(i, OP_DISPLAYTEST, 0);
-            setScanLimit(i, 7); // scanlimit: 8 LEDs
-            spiTransfer(i, OP_DECODEMODE, 0); // decoding： BCD
-            clearDisplay(i);
-            // we go into shutdown-mode on startup
-            shutdown(i, true);
+            maxDevices = numDevices;
+            if (numDevices < 1 || numDevices > 8) {
+                maxDevices = 8;
+            }
+
+            for (int i = 0; i < maxDevices; i++) {
+                spiTransfer(i, OP_DISPLAYTEST, 0);
+                setScanLimit(i, 7); // scanlimit: 8 LEDs
+                spiTransfer(i, OP_DECODEMODE, 0); // decoding： BCD
+                clearDisplay(i);
+                // we go into shutdown-mode on startup
+                shutdown(i, true);
+            }
+
+        }catch (IOException e) {
+            Log.w(TAG, "Unable to access SPI device", e);
         }
     }
 

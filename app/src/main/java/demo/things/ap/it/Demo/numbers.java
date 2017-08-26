@@ -16,15 +16,30 @@ public class numbers {
             (byte) 0b00111111,(byte) 0b00111111,(byte) 0b00000011,(byte) 0b00000011,(byte) 0b00000011,(byte) 0b00000011,(byte) 0b00000011,(byte) 0b00000011
         };
 
-        public static final byte[] ALIEN_1_FRAME_2 = new byte[]{
-                (byte) 0b00011000,
-                (byte) 0b00111100,
-                (byte) 0b01111110,
-                (byte) 0b11011011,
-                (byte) 0b11111111,
-                (byte) 0b00100100,
-                (byte) 0b01011010,
-                (byte) 0b01000010
+        public static final byte[] startAll = new byte[]{
+                (byte) 0b10001111,(byte) 0b10000001,(byte) 0b11101111,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+
+                (byte) 0b10001000,(byte) 0b01010000,(byte) 0b00100011,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+
+                (byte) 0b00100010,(byte) 0b00100010,(byte) 0b10111110,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+
+                (byte) 0b00000010,(byte) 0b00000010,(byte) 0b00001111,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b10001111,(byte) 0b10001000,(byte) 0b10001000,
+
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b10001000,(byte) 0b10001000,(byte) 0b11111000,
+
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b00100010,(byte) 0b00010010,(byte) 0b00111110,
+
+                (byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,(byte) 0b00000000,
+                (byte) 0b00000000,(byte) 0b00000010,(byte) 0b00000010,(byte) 0b00000010,
         };
 
         public static final byte[] ALIEN_2_FRAME_1 = new byte[]{

@@ -20,6 +20,11 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.GpioCallback;
 import com.google.android.things.pio.PeripheralManagerService;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -46,11 +51,15 @@ public class MainActivity extends AppCompatActivity {
 // Access the display:
 
     private BluetoothAdapter mBluetoothAdapter;
+    private int intY = 0;
+    private int intX = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+
         testobtn1 = (TextView) findViewById(R.id.textView);
 
         // Create a storage reference from our app
@@ -59,26 +68,42 @@ public class MainActivity extends AppCompatActivity {
 
         PeripheralManagerService service = new PeripheralManagerService();
 
+// Write a message to the database
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
+        DatabaseReference myRef = database.getReference("DataIOT");
 
-        t1=new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+        myRef.setValue("Hello, World!");
+        myRef.child("PHOTO").child("0").setValue("01.jpg");
+        myRef.child("PHOTO").child("1").setValue("02.jpg");
+        myRef.child("PHOTO").child("2").setValue("03.jpg");
+        myRef.child("PHOTO").child("3").setValue("04.jpg");
+
+
+        // Read from the database
+        myRef.addValueEventListener(new ValueEventListener() {
             @Override
-            public void onInit(int status) {
-                if(status != TextToSpeech.ERROR) {
-                    Log.d(TAG, "tts ok");
-                    t1.setLanguage(Locale.ITALIAN);
-                }
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // This method is called once with the initial value and again
+                // whenever data at this location is updated.
+                t1.speak("Valore Database Aggiornato supercalifragilistichespiralidoso", TextToSpeech.QUEUE_FLUSH, null,null);
+                Log.w(TAG, "mod.");
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                // Failed to read value
+                Log.w(TAG, "Failed to read value.", error.toException());
             }
         });
 
-        //t1.speak("ciao", TextToSpeech.QUEUE_FLUSH, null,null);
 
 
 
 
         testobtn1.setText("GPIO Disponibili " + service.getGpioList().toString());
 
-
-        try {
+       try {
             Led = new Led72xx("SPI0.0", 8);
             for (int i = 0; i < Led.getDeviceCount(); i++) {
                 Led.setIntensity(i, 13);
@@ -106,6 +131,10 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "Error on PeripheralIO API ", e);
 
         }
+
+
+
+
 /*
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mBluetoothAdapter != null) {
@@ -182,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
                 Led.setRow(ii,3,(byte) 0b00000000);
                 Led.setRow(ii,2,(byte) 0b00000000);
                 Led.setRow(ii,1,(byte) 0b00000000);
-                Led.setRow(ii,0,(byte) 0b00000000);
+                Led.setRow(ii,0,(byte) 0x31);
                 ii = 3;
 
                 Led.setRow(ii,7,(byte) 0b00000011);
@@ -257,37 +286,94 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart(){
         super.onStart();
+        Log.d(TAG, "tts");
+        t1=new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if(status != TextToSpeech.ERROR) {
+                    Log.d(TAG, "tts ok");
+                    t1.setLanguage(Locale.ITALIAN);
+                } else {Log.e(TAG, "tts ERR");
 
+                }
+            }
+        });
+        /*try {
+
+            byte[] frame = numbers.num1;
+
+            for (int row = 0; row < 32; row++) {
+                int device = 0;
+                int rowp = row;
+                if (row > 7) {
+                    device = 1;
+                    rowp = row-8;
+
+                }
+                if (row > 15) {
+                    device = 4;
+                    rowp = row-16;
+                }
+                if (row > 23) {
+                    device = 5;
+                    rowp = row-24;
+                }
+
+
+                Led.setRow(device, rowp, frame[row]);
+            }
+
+
+
+
+
+        } catch (IOException e) {
+            Log.e(TAG, "Error initializing LED matrix", e);
+        }*/
         try {
 
-        byte[] frame = numbers.num1;
+        byte[] frame = numbers.startAll;
 
-        for (int row = 0; row < 32; row++) {
-            int device = 0;
-            int rowp = row;
-            if (row > 7) {
-                device = 1;
-                rowp = row-8;
 
+            for (int row = 0; row < 64; row++) {
+                int device = 0;
+                int rowp = row;
+                if (row > 7) {
+                    device = 1;
+                    rowp = row-8;
+
+                }
+                if (row > 15) {
+                    device = 2;
+                    rowp = row-16;
+                }
+                if (row > 23) {
+                    device = 3;
+                    rowp = row-24;
+                }
+                if (row > 31) {
+                    device = 4;
+                    rowp = row-32;
+
+                }
+                if (row > 39) {
+                    device = 5;
+                    rowp = row-40;
+                }
+                if (row > 47) {
+                    device = 6;
+                    rowp = row-48;
+                }
+                if (row > 55) {
+                    device = 7;
+                    rowp = row-56;
+                }
+
+
+
+                Led.setRow(device, rowp, frame[row]);
             }
-            if (row > 15) {
-                device = 4;
-                rowp = row-16;
-            }
-            if (row > 23) {
-                device = 5;
-                rowp = row-24;
-            }
-
-
-            Led.setRow(device, rowp, frame[row]);
-        }
-
-
-
-
-
-            } catch (IOException e) {
+        } catch (IOException e) {
             Log.e(TAG, "Error initializing LED matrix", e);
         }
        // mBluetoothAdapter.startDiscovery();
