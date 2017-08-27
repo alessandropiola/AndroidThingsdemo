@@ -29,10 +29,17 @@ import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "HomeActivity";
@@ -53,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter mBluetoothAdapter;
     private int intY = 0;
     private int intX = 0;
+    private StorageReference islandRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,8 +93,79 @@ public class MainActivity extends AppCompatActivity {
             public void onDataChange(DataSnapshot dataSnapshot) {
                 // This method is called once with the initial value and again
                 // whenever data at this location is updated.
-                t1.speak("Valore Database Aggiornato supercalifragilistichespiralidoso", TextToSpeech.QUEUE_FLUSH, null,null);
+                t1.speak("CIAO, benvenuti, ecco la lista delle foto", TextToSpeech.QUEUE_FLUSH, null,null);
                 Log.w(TAG, "mod.");
+
+                Map<String, String> value = (Map<String, String>) dataSnapshot.getValue();
+                //Log.i("dataSnapshot", "dataSnapshot" + new JSONObject(value));
+                JSONObject jsonPhoto = new JSONObject(value);
+                // Find the right array object
+                try {
+                    //JSONArray jsonArray = jsonPhoto.getJSONArray("PHOTO");
+                    MyDataModel dataModel=MyDataModel.getInstance();
+                    final List<String> values = new ArrayList<String>();
+                    for (int i=0; i< jsonPhoto.length(); i++) {
+                        final JSONArray jsonArray = jsonPhoto.getJSONArray("PHOTO");
+                        for (int ii=0; ii< jsonArray.length(); ii++) {
+                            Log.i("dataSnapshot", "dataSnapshot" +jsonArray.get(ii).toString());
+                            final int finalIi = ii;
+                            Thread t = new Thread(new Runnable() {
+
+
+                                @Override
+                                public void run() {
+                                    //final StorageReference islandRef;
+                                    try {
+                                        islandRef = storageRef.child("images/"+jsonArray.get(finalIi).toString());
+                                        File localFile = null;
+                                        try {
+                                            localFile = File.createTempFile("images", ".jpg");
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                        }
+
+                                        final File finalLocalFile = localFile;
+                                        islandRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                                            @Override
+                                            public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+                                                Log.i(TAG, "dataSnapshot ok"+islandRef.toString());
+                                                values.add(finalLocalFile.getName());
+
+                                                Log.i(TAG, "dataSnapshot ok"+finalLocalFile.getName());
+
+                                            }
+                                        }).addOnFailureListener(new OnFailureListener() {
+                                            @Override
+                                            public void onFailure(@NonNull Exception exception) {
+                                                // Handle any errors
+                                                Log.e(TAG, "dwn err");
+                                            }
+                                        });
+                                    } catch (JSONException e) {
+                                        e.printStackTrace();
+                                    }
+
+
+
+                                }
+                            });
+                            t.start();
+
+                        }
+
+
+
+                    }
+                    dataModel.setLista(values);
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+
+
+
+
 
             }
 
@@ -199,6 +278,14 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "GPIO changed, button pressed.");
             testobtn1.setText("pulsante Premuto...");
             t1.speak("Tasto premuto", TextToSpeech.QUEUE_FLUSH, null,null);
+            MyDataModel dataModel=MyDataModel.getInstance();
+            List<String> lista = dataModel.getlista();
+            Log.i(TAG, "lista"+getBaseContext().getCacheDir()+"/"+lista.get(0));
+            ImageView img = (ImageView)findViewById(R.id.imageView2);
+            Bitmap bMap = BitmapFactory.decodeFile(getBaseContext().getCacheDir()+"/"+lista.get(0));
+            img.setImageBitmap(bMap);
+
+
 
             try {
 
@@ -249,34 +336,7 @@ public class MainActivity extends AppCompatActivity {
          }
 
 
-            final StorageReference islandRef = storageRef.child("images/11.jpg");
 
-            File localFile = null;
-            try {
-                localFile = File.createTempFile("images", "jpg");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            final File finalLocalFile = localFile;
-            islandRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
-                @Override
-                public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
-                    // Local temp file has been created
-                    ImageView click = (ImageView)findViewById(R.id.imageView2);
-                    Bitmap image = BitmapFactory.decodeFile(finalLocalFile.getAbsolutePath());
-
-
-                    click.setImageBitmap(image);
-                    Log.i(TAG, "dwn ok"+islandRef.toString());
-                }
-            }).addOnFailureListener(new OnFailureListener() {
-                @Override
-                public void onFailure(@NonNull Exception exception) {
-                    // Handle any errors
-                    Log.e(TAG, "dwn err");
-                }
-            });
 
 
             // Step 5. Return true to keep callback active.
