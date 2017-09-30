@@ -9,14 +9,24 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.hardware.usb.UsbDevice;
+import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Message;
+import android.os.SystemClock;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.WindowManager;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -31,6 +41,8 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
+import com.hoin.usbsdk.UsbController;
+import com.hoin.wfsdk.PrintPic;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,16 +51,26 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
 
-public class MainActivity extends AppCompatActivity {
+import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.SmbException;
+import jcifs.smb.SmbFile;
+
+public class MainActivity extends AppCompatActivity implements Observer {
     private static final String TAG = "HomeActivity";
-    private static final String BUTTON_PIN_NAME = "BCM21"; // GPIO port wired to the button
 
-    private Gpio mButtonGpio;
+    private static final String BUTTON_PIN_print = "BCM21"; // GPIO port wired to the button
+    private static final String BUTTON_PIN_next = "BCM20"; // GPIO port wired to the button
+
+    private Gpio mButtonGpio_print;
+    private Gpio mButtonGpio_next;
     TextView testobtn1;
 
     Led72xx Led;
@@ -66,6 +88,11 @@ public class MainActivity extends AppCompatActivity {
     private StorageReference islandRef;
     private int finalIi;
     JSONArray jsonArray = null;
+    MyDataModel dataModel;
+    UsbController usbCtrl = null;
+    private int[][] u_infor;
+    UsbDevice dev = null;
+
 
     public MainActivity() {
     }
@@ -76,6 +103,23 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
 
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        //usb-----------------------------------
+        usbCtrl = new UsbController(this,mHandler);
+        u_infor = new int[5][2];
+        u_infor[0][0] = 0x1CBE;
+        u_infor[0][1] = 0x0003;
+        u_infor[1][0] = 0x1CB0;
+        u_infor[1][1] = 0x0003;
+        u_infor[2][0] = 0x0483;
+        u_infor[2][1] = 0x5740;
+        u_infor[3][0] = 0x0493;
+        u_infor[3][1] = 0x8760;
+        u_infor[4][0] = 0x0471;
+        u_infor[4][1] = 0x0055;
+        //-USB
+
         testobtn1 = (TextView) findViewById(R.id.textView);
 
         // Create a storage reference from our app
@@ -84,15 +128,19 @@ public class MainActivity extends AppCompatActivity {
 
         PeripheralManagerService service = new PeripheralManagerService();
 
-// Write a message to the database
+        // Write a message to the database
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myRef = database.getReference("DataIOT");
 
         myRef.setValue("Hello, World!");
-        myRef.child("PHOTO").child("0").setValue("11.jpg");
-        myRef.child("PHOTO").child("1").setValue("09.jpg");
-        myRef.child("PHOTO").child("2").setValue("06.jpg");
-        myRef.child("PHOTO").child("3").setValue("07.jpg");
+        myRef.child("PHOTO").child("0").setValue("D01.jpg");
+        myRef.child("PHOTO").child("1").setValue("D02.jpg");
+        myRef.child("PHOTO").child("2").setValue("D03.jpg");
+        myRef.child("PHOTO").child("3").setValue("D04.jpg");
+        myRef.child("PHOTO").child("4").setValue("D05.jpg");
+        myRef.child("PHOTO").child("5").setValue("D05.jpg");
+        myRef.child("PHOTO").child("6").setValue("D06.jpg");
+        myRef.child("PHOTO").child("7").setValue("D07.jpg");
 
 
         // Read from the database
@@ -149,13 +197,7 @@ public class MainActivity extends AppCompatActivity {
                                     });
 
 
-
-
-
-
                         }
-
-
 
                     }
                     dataModel.setLista(values);
@@ -163,11 +205,6 @@ public class MainActivity extends AppCompatActivity {
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
-
-
-
-
-
 
             }
 
@@ -182,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        testobtn1.setText("GPIO Disponibili " + service.getGpioList().toString());
+       // testobtn1.setText("GPIO Disponibili " + service.getGpioList().toString());
 
        try {
             Led = new Led72xx("SPI0.0", 8);
@@ -198,22 +235,33 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-
         try {
             // Step 1. Create GPIO connection.
-            mButtonGpio = service.openGpio(BUTTON_PIN_NAME);
+            mButtonGpio_print = service.openGpio(BUTTON_PIN_print);
             // Step 2. Configure as an input.
-            mButtonGpio.setDirection(Gpio.DIRECTION_IN);
+            mButtonGpio_print.setDirection(Gpio.DIRECTION_IN);
             // Step 3. Enable edge trigger events.
-            mButtonGpio.setEdgeTriggerType(Gpio.EDGE_FALLING);
+            mButtonGpio_print.setEdgeTriggerType(Gpio.EDGE_FALLING);
             // Step 4. Register an event callback.
-            mButtonGpio.registerGpioCallback(mCallback);
+            mButtonGpio_print.registerGpioCallback(mCallback);
         } catch (IOException e) {
             Log.e(TAG, "Error on PeripheralIO API ", e);
 
         }
 
+        try {
+            // Step 1. Create GPIO connection.
+            mButtonGpio_next = service.openGpio(BUTTON_PIN_next);
+            // Step 2. Configure as an input.
+            mButtonGpio_next.setDirection(Gpio.DIRECTION_IN);
+            // Step 3. Enable edge trigger events.
+            mButtonGpio_next.setEdgeTriggerType(Gpio.EDGE_FALLING);
+            // Step 4. Register an event callback.
+            mButtonGpio_next.registerGpioCallback(mCallback);
+        } catch (IOException e) {
+            Log.e(TAG, "Error on PeripheralIO API ", e);
 
+        }
 
 
 /*
@@ -247,6 +295,7 @@ public class MainActivity extends AppCompatActivity {
         //registerReceiver(mReceiver, filter);
 
 
+
     }
     // Create a BroadcastReceiver for ACTION_FOUND.
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
@@ -274,14 +323,66 @@ public class MainActivity extends AppCompatActivity {
         }
     };
     private int intSetphoto = 0;
+    private long mLastClickTime;
     // Step 4. Register an event callback.
     private GpioCallback mCallback = new GpioCallback() {
         @Override
         public boolean onGpioEdge(Gpio gpio) {
-            Log.i(TAG, "GPIO changed, button pressed.");
-            testobtn1.setText("pulsante Premuto...");
-            t1.speak("Tasto premuto", TextToSpeech.QUEUE_FLUSH, null,null);
-            MyDataModel dataModel=MyDataModel.getInstance();
+
+            Log.i(TAG, "GPIO changed, button pressed."+ gpio.getName());
+            // Preventing multiple clicks, using threshold of 1 second
+            if (SystemClock.elapsedRealtime() - mLastClickTime < 1000) {
+                return true;
+            }
+            mLastClickTime = SystemClock.elapsedRealtime();
+
+
+
+            if (gpio.getName().toString().contains("BCM21".toString())){
+                testobtn1.setText("pulsante Premuto...");
+                t1.speak("Gastronomia serviamo il numero", TextToSpeech.QUEUE_FLUSH, null,null);
+
+
+            }
+
+            if (gpio.getName().toString().contains("BCM20".toString())){
+                if( CheckUsbPermission() == true ) {
+
+                usbCtrl.sendMsg("D'ITALY", "GBK", dev);
+                //usbCtrl.sendMsg("Codice: 808080 e altre cose non per il cliente\n","GBK", dev);
+                usbCtrl.sendByte(const_escpos.getInit(), dev);
+                const_escpos.getFrontVert("D'Italy                                                   ",
+                        "Testo1", "1", "Testo2", "DItalyTower.it","GASTRON");
+                printImage("vert");
+                usbCtrl.sendMsg(".", "GBK", dev);
+                usbCtrl.sendByte(const_escpos.getInitStampoBarre(), dev);
+                usbCtrl.sendByte(const_escpos.getBarreStampoBarre(), dev);
+                usbCtrl.sendByte("8001435500013".getBytes(), dev);
+                usbCtrl.sendByte(const_escpos.getInit(), dev);
+                usbCtrl.sendMsg("gg/mm/aaaa\n", "GBK", dev);
+                usbCtrl.sendByte(const_escpos.getTaglioCarta(), dev);
+
+
+                    usbCtrl.sendMsg("D'ITALY", "GBK", dev);
+                    //usbCtrl.sendMsg("Codice: 808080 e altre cose non per il cliente\n","GBK", dev);
+                    usbCtrl.sendByte(const_escpos.getInit(), dev);
+                    const_escpos.getFrontNormale("D'Italy  GASTRONOMIA                                                 ",
+                            "Num 1", "http://www.ditaly.it/", "seguici su");// "DItalyTower.it","GASTRON");
+                    printImage("oriz");
+                    usbCtrl.sendMsg(" ", "GBK", dev);
+                    usbCtrl.sendByte(const_escpos.getInitStampoBarre(), dev);
+                    usbCtrl.sendByte(const_escpos.getBarreStampoBarre(), dev);
+                    usbCtrl.sendByte("8001435500013".getBytes(), dev);
+                    usbCtrl.sendByte(const_escpos.getInit(), dev);
+                    usbCtrl.sendMsg("gg/mm/aaaa\n", "GBK", dev);
+                    usbCtrl.sendByte(const_escpos.getTaglioCarta(), dev);
+
+
+                }
+
+
+            }
+            /*MyDataModel dataModel=MyDataModel.getInstance();
             List<String> lista = dataModel.getlista();
             Log.i(TAG, intSetphoto+" GPIO changed, button pressed.size:"+lista.size());
             if (intSetphoto > lista.size()-1) {
@@ -293,16 +394,20 @@ public class MainActivity extends AppCompatActivity {
             Bitmap bMap = BitmapFactory.decodeFile(getBaseContext().getCacheDir()+"/"+lista.get(intSetphoto));
             img.setImageBitmap(bMap);
 
-            RelativeLayout rl = (RelativeLayout) findViewById(R.id.mainframe);
-            Drawable backImg = Drawable.createFromPath(getBaseContext().getCacheDir()+"/"+lista.get(intSetphoto));
+            //RelativeLayout rl = (RelativeLayout) findViewById(R.id.mainframe);
+            //Drawable backImg = Drawable.createFromPath(getBaseContext().getCacheDir()+"/"+lista.get(intSetphoto));
            // backImg.setAlpha(90);
-            rl.setBackground(backImg);
-            intSetphoto++;
+            //rl.setBackground(backImg);
+            intSetphoto++;*/
 
 
 
 
-            try {
+
+
+
+
+       /*     try {
 
                 int ii = 2;
 
@@ -348,7 +453,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 Log.e(TAG, "Error on PeripheralIO API ", e);
 
-         }
+         }*/
 
 
 
@@ -361,6 +466,36 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart(){
         super.onStart();
+
+        startService(new Intent(getApplicationContext(), AService.class));
+        Log.i("service","START");
+
+       /* new Thread(new Runnable() {
+            public void run() {
+                // a potentially  time consuming task
+                Log.d(TAG, "file");
+                SmbFile[] domains;
+                NtlmPasswordAuthentication auth = new NtlmPasswordAuthentication(null, null, null);
+                try {
+                    domains = (new SmbFile("smb://192.168.0.111/AndPubblica/", auth.ANONYMOUS)).listFiles();
+                    for (int i = 0; i < domains.length; i++) {
+                        System.out.println(domains[i]);
+                        SmbFile[] servers = domains[i].listFiles();
+                        for (int j = 0; j < servers.length; j++) {
+                            System.out.println("\t"+servers[j]);
+                            Log.d(TAG, "file"+"\t"+servers[j]);
+                        }
+                    }
+                } catch (SmbException e) {
+                    e.printStackTrace();
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                }
+            }
+        });//.start();
+
+*/
+
         Log.d(TAG, "tts");
         t1=new TextToSpeech(this, new TextToSpeech.OnInitListener() {
             @Override
@@ -368,12 +503,15 @@ public class MainActivity extends AppCompatActivity {
                 if(status != TextToSpeech.ERROR) {
                     Log.d(TAG, "tts ok");
                     t1.setLanguage(Locale.ITALIAN);
+                    AudioManager audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC,audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0);
+
                 } else {Log.e(TAG, "tts ERR");
 
                 }
             }
         });
-        /*try {
+        try {
 
             byte[] frame = numbers.num1;
 
@@ -404,8 +542,12 @@ public class MainActivity extends AppCompatActivity {
 
         } catch (IOException e) {
             Log.e(TAG, "Error initializing LED matrix", e);
-        }*/
-        try {
+        }
+
+
+        dataModel = MyDataModel.getInstance();
+        dataModel.addObserver(this);
+/*        try {
 
         byte[] frame = numbers.startAll;
 
@@ -453,16 +595,26 @@ public class MainActivity extends AppCompatActivity {
         }
        // mBluetoothAdapter.startDiscovery();
 
+*/
+
     }
     @Override
     protected void onDestroy() {
         super.onDestroy();
 
         // Step 6. Close the resource
-        if (mButtonGpio != null) {
-            mButtonGpio.unregisterGpioCallback(mCallback);
+        if (mButtonGpio_next != null) {
+            mButtonGpio_next.unregisterGpioCallback(mCallback);
             try {
-                mButtonGpio.close();
+                mButtonGpio_next.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Error on PeripheralIO API", e);
+            }
+        }
+        if (mButtonGpio_print != null) {
+            mButtonGpio_print.unregisterGpioCallback(mCallback);
+            try {
+                mButtonGpio_print.close();
             } catch (IOException e) {
                 Log.e(TAG, "Error on PeripheralIO API", e);
             }
@@ -471,6 +623,125 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    @Override
+    public void update(Observable observable, Object o) {
+        Log.i("service","Observer");
+        MyDataModel dataModel=MyDataModel.getInstance();
+        final List<String> lista = dataModel.getlista();
+
+        if (lista.size()>0) {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    testobtn1.setText("pulsante Premuto...");
+                    Log.i(TAG, intSetphoto + " GPIO changed, button pressed.size:" + lista.size());
+                    if (intSetphoto > lista.size() - 1) {
+                        intSetphoto = 0;
+                    }
+
+                    Log.i(TAG, "GPIO changed, button pressed.photo:" + intSetphoto);
+                    Log.i(TAG, "lista" + getBaseContext().getCacheDir() + "/" + lista.get(intSetphoto));
+                    ImageView img = (ImageView) findViewById(R.id.imageView2);
+                    Bitmap bMap = BitmapFactory.decodeFile(getBaseContext().getCacheDir() + "/" + lista.get(intSetphoto));
+                    img.setImageBitmap(bMap);
+                    Animation animationL = AnimationUtils.loadAnimation(getApplicationContext(),R.anim.left);
+                    img.startAnimation(animationL);
+
+
+                    intSetphoto++;
+                }
+
+            });
+        }
+
+
+    }
+
+
+
+    private final Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case UsbController.USB_CONNECTED:
+
+                    break;
+                default:
+                    break;
+            }
+        }
+    };
+    public boolean CheckUsbPermission(){
+        usbCtrl.close();
+        int  i = 0;
+        for( i = 0 ; i < 5 ; i++ ){
+            dev = usbCtrl.getDev(u_infor[i][0],u_infor[i][1]);
+            if(dev != null)
+                break;
+        }
+        if( dev != null ){
+            if( !(usbCtrl.isHasPermission(dev))){
+                //Log.d("usb����","����USB�豸Ȩ��.");
+                usbCtrl.getPermission(dev);
+            }else{
+
+            }
+        }
+        if( dev != null ){
+            if( usbCtrl.isHasPermission(dev)){
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void printImage(String NomeFile) {
+        byte[] sendData = null;
+        String path = Environment.getExternalStorageDirectory() + "/";
+        //File fileD = new File(path);
+        //fileD.mkdirs();
+
+        PrintPic pg = new PrintPic();
+        int i = 0,s = 0,j = 0,index = 0,lines = 0;
+        pg.initCanvas(580);
+        pg.initPaint();
+        pg.drawImage(0,0, path+ "/"+NomeFile+".png");
+        sendData = pg.printDraw();
+        byte[] temp = new byte[(pg.getWidth() / 8)*5];
+        byte[] dHeader = new byte[8];
+        if(pg.getLength()!=0){
+            dHeader[0] = 0x1D;
+            dHeader[1] = 0x76;
+            dHeader[2] = 0x30;
+            dHeader[3] = 0x00;
+            dHeader[4] = (byte)(pg.getWidth()/8);
+            dHeader[5] = 0x00;
+            dHeader[6] = (byte)(pg.getLength()%256);
+            dHeader[7] = (byte)(pg.getLength()/256);
+            usbCtrl.sendByte(dHeader,dev);
+            for( i = 0 ; i < (pg.getLength()/5)+1 ; i++ ){         //ÿ��5�з���һ��ͼƬ����
+                s = 0;
+                if( i < pg.getLength()/5 ){
+                    lines = 5;
+                }else{
+                    lines = pg.getLength()%5;
+                }
+                for( j = 0 ; j < lines*(pg.getWidth() / 8) ; j++ ){
+                    temp[s++] = sendData[index++];
+                }
+                usbCtrl.sendByte(temp,dev);
+                try {
+                    Thread.sleep(1);                              //ÿ��һ����ʱ60����
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                for(j = 0 ; j <(pg.getWidth()/8)*5 ; j++ ){         //����������
+                    temp[j] = 0;
+                }
+            }
+        }
+    }
 }
 
 /*
