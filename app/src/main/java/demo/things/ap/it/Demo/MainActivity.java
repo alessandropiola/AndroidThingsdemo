@@ -1,12 +1,18 @@
 package demo.things.ap.it.Demo;
 
+import android.animation.Animator;
+import android.animation.AnimatorInflater;
+import android.animation.ObjectAnimator;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Point;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.hardware.usb.UsbDevice;
@@ -16,20 +22,30 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
+import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.view.Display;
+import android.view.View;
 import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.GpioCallback;
 import com.google.android.things.pio.PeripheralManagerService;
@@ -38,6 +54,8 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig;
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings;
 import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -53,6 +71,8 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -92,7 +112,9 @@ public class MainActivity extends AppCompatActivity implements Observer {
     UsbController usbCtrl = null;
     private int[][] u_infor;
     UsbDevice dev = null;
-
+    private String fbCount;
+    private String Android_id;
+    private boolean varStart = false;
 
     public MainActivity() {
     }
@@ -104,6 +126,9 @@ public class MainActivity extends AppCompatActivity implements Observer {
 
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+
+
 
         //usb-----------------------------------
         usbCtrl = new UsbController(this,mHandler);
@@ -120,7 +145,7 @@ public class MainActivity extends AppCompatActivity implements Observer {
         u_infor[4][1] = 0x0055;
         //-USB
 
-        testobtn1 = (TextView) findViewById(R.id.textView);
+        testobtn1 = (TextView) findViewById(R.id.txtCodeLic);
 
         // Create a storage reference from our app
         storage = FirebaseStorage.getInstance();
@@ -128,22 +153,171 @@ public class MainActivity extends AppCompatActivity implements Observer {
 
         PeripheralManagerService service = new PeripheralManagerService();
 
+        final String uuid  = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+
         // Write a message to the database
         FirebaseDatabase database = FirebaseDatabase.getInstance();
-        DatabaseReference myRef = database.getReference("DataIOT");
+        final DatabaseReference licAIO = database.getReference("LicenzaAIO");
+        licAIO.child("VAL").setValue("sblocco-logo223*91-sfondo1500*1200");
 
-        myRef.setValue("Hello, World!");
-        myRef.child("PHOTO").child("0").setValue("D01.jpg");
-        myRef.child("PHOTO").child("1").setValue("D02.jpg");
-        myRef.child("PHOTO").child("2").setValue("D03.jpg");
-        myRef.child("PHOTO").child("3").setValue("D04.jpg");
-        myRef.child("PHOTO").child("4").setValue("D05.jpg");
-        myRef.child("PHOTO").child("5").setValue("D05.jpg");
-        myRef.child("PHOTO").child("6").setValue("D06.jpg");
-        myRef.child("PHOTO").child("7").setValue("D07.jpg");
+        licAIO.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                Map<String, String> value = (Map<String, String>) dataSnapshot.getValue();
+                Log.i(TAG, "dataSnapshot" + new JSONObject(value));
+                try {
+                    JSONObject jo = new JSONObject(value);
+                    String sblocco = jo.getString(uuid).toString();
+                    Log.w("dataSnapshot",sblocco);
+                    final String[] separated = sblocco.split("-");
+                    if (separated[0].toString().equals("YES".toString())) {
+                        //dwn sfondo
+                        islandRef = storageRef.child(separated[2]);
+                        File localFile = null;
+                        try {
+                            localFile = File.createTempFile(separated[2], ".jpg");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                        final File finalLocalFile = localFile;
+                        islandRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                            @Override
+                            public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+                                Log.i(TAG+"-DWN",  " dwn ok "+finalLocalFile.getName());
+                                runOnUiThread(new Runnable() {
+                                    public void run() {
+                                        RelativeLayout rl = (RelativeLayout)findViewById(R.id.mainframe);
+                                        final Bitmap bMap = BitmapFactory.decodeFile(getBaseContext().getCacheDir() + "/" + finalLocalFile.getName());
+
+                                        Drawable dr = new BitmapDrawable(bMap);
+                                        rl.setBackgroundDrawable(dr);
+
+                                    }
+                                });
 
 
-        // Read from the database
+                            }
+                        }).addOnFailureListener(new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception exception) {
+                                // Handle any errors
+                                Log.e(TAG+"-DWN", "dwn err"+separated[1]);
+                            }
+                        });
+
+                        //dwn logo
+                        islandRef = storageRef.child(separated[1]);
+                        localFile = null;
+                        try {
+                            localFile = File.createTempFile(separated[1], ".jpg");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                        final File finalLocalFile2 = localFile;
+                        islandRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                            @Override
+                            public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+                                Log.i(TAG+"-DWN",  " dwn ok "+finalLocalFile2.getName());
+                                runOnUiThread(new Runnable() {
+                                    public void run() {
+                                        final ImageView img = (ImageView) findViewById(R.id.logo);
+                                        img.setVisibility(View.INVISIBLE);
+                                        final Bitmap bMap = BitmapFactory.decodeFile(getBaseContext().getCacheDir() + "/" + finalLocalFile2.getName());
+                                        img.setImageBitmap(bMap);
+                                        img.setVisibility(View.VISIBLE);
+                                    }
+                                });
+
+
+                                }
+                        }).addOnFailureListener(new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception exception) {
+                                // Handle any errors
+                                Log.e(TAG+"-DWN", "dwn err"+separated[1]);
+                            }
+                        });
+                        //start Services
+                        startService(new Intent(getApplicationContext(), AService.class));
+                    }
+
+
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    licAIO.child(uuid).setValue("blocco-logo_ylh.png-sfondo1.png");
+
+                }
+                // Find the right array object
+
+
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+
+        DatabaseReference myRef = database.getReference("DataAIO"+uuid);
+        DatabaseReference myCode = database.getReference("Promotion");
+
+        myRef.child("PHOTO").child("1").setValue("qrcode.png");
+        myRef.child("PHOTO").child("2").setValue("D04.jpg");
+        myRef.child("PHOTO").child("3").setValue("D05.jpg");
+        myRef.child("PHOTO").child("4").setValue("qrcode.png");
+        myRef.child("PHOTO").child("5").setValue("D06.jpg");
+        myRef.child("PHOTO").child("6").setValue("seguicisufacebook.png");
+        myRef.child("PHOTO").child("9").setValue("D07.jpg");
+
+        myRef.child("FBcount").setValue("");
+
+        myCode.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // This method is called once with the initial value and again
+                // whenever data at this location is updated.
+                Map<String, String> value = (Map<String, String>) dataSnapshot.getValue();
+                Log.i(TAG, "dataSnapshot" + new JSONObject(value));
+                JSONObject jsonPhoto = new JSONObject(value);
+                // Find the right array object
+                try {
+                    MyDataModel dataModel=MyDataModel.getInstance();
+                    final List<String> values = new ArrayList<String>();
+                    for (int i=0; i< jsonPhoto.length(); i++) {
+                        JSONObject jo = jsonPhoto.getJSONObject("mailcode");
+                        Iterator<String> keys = jo.keys();
+                        // get some_name_i_wont_know in str_Name
+                        while (keys.hasNext()) {
+                            String nodo = keys.next();
+                            Log.w(TAG,nodo);
+                            JSONObject jol = jo.getJSONObject(nodo);
+                            Log.w(TAG, "pre dwn "+ jol.toString());
+                            Log.w(TAG, "pre dwn "+ jol.getString("emailAddress"));
+                            Log.w(TAG, "pre dwn "+ jol.getString("value"));
+                        }
+
+
+                        }
+                    }
+                catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+                }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+
+        // Read from the database lettura da firebase
         myRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -153,22 +327,23 @@ public class MainActivity extends AppCompatActivity implements Observer {
                 Log.w(TAG, "mod.");
 
                 Map<String, String> value = (Map<String, String>) dataSnapshot.getValue();
-                //Log.i("dataSnapshot", "dataSnapshot" + new JSONObject(value));
+                Log.i(TAG, "dataSnapshot" + new JSONObject(value));
                 JSONObject jsonPhoto = new JSONObject(value);
                 // Find the right array object
                 try {
+                    fbCount = jsonPhoto.getString("FBcount").toString();
                     //JSONArray jsonArray = jsonPhoto.getJSONArray("PHOTO");
                     MyDataModel dataModel=MyDataModel.getInstance();
                     final List<String> values = new ArrayList<String>();
                     for (int i=0; i< jsonPhoto.length(); i++) {
                         jsonArray = jsonPhoto.getJSONArray("PHOTO");
                         for (int ii=0; ii< jsonArray.length(); ii++) {
-                            Log.i("dataSnapshot", "pre dwn " +jsonArray.get(ii).toString());
+                            Log.i(TAG+"-DWN", "pre dwn " +jsonArray.get(ii).toString());
                             finalIi = ii;
                             final int finalIi1 = ii;
                             String strName = jsonArray.get(finalIi1).toString();
 
-                                Log.i(TAG,"  dwn "+ finalIi + "images/"+strName);
+                                Log.i(TAG+"-DWN","  dwn "+ finalIi + "images/"+strName);
 
                                     islandRef = storageRef.child("images/"+strName);
                                     File localFile = null;
@@ -182,7 +357,7 @@ public class MainActivity extends AppCompatActivity implements Observer {
                                     islandRef.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
                                         @Override
                                         public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
-                                            Log.i(TAG,  " dwn ok "+finalLocalFile.getName());
+                                            Log.i(TAG+"-DWN",  " dwn ok "+finalLocalFile.getName());
                                             values.add(finalLocalFile.getName());
 
 
@@ -192,7 +367,7 @@ public class MainActivity extends AppCompatActivity implements Observer {
                                         @Override
                                         public void onFailure(@NonNull Exception exception) {
                                             // Handle any errors
-                                            Log.e(TAG, "dwn err");
+                                            Log.e(TAG+"-DWN", "dwn err");
                                         }
                                     });
 
@@ -216,10 +391,14 @@ public class MainActivity extends AppCompatActivity implements Observer {
         });
 
 
-
-
-
-       // testobtn1.setText("GPIO Disponibili " + service.getGpioList().toString());
+        PackageInfo pInfo = null;
+        try {
+            pInfo = this.getPackageManager().getPackageInfo(getPackageName(), 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+        String version = pInfo.versionName;
+       testobtn1.setText(uuid);
 
        try {
             Led = new Led72xx("SPI0.0", 8);
@@ -262,6 +441,31 @@ public class MainActivity extends AppCompatActivity implements Observer {
             Log.e(TAG, "Error on PeripheralIO API ", e);
 
         }
+        ImageButton insertcode = (ImageButton) findViewById(R.id.imageButton);
+        insertcode.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.i(TAG, "Stampo etichetta");
+                if( CheckUsbPermission() == true ) {
+
+                    usbCtrl.sendByte(const_escpos.getInit(), dev);
+                    const_escpos.getFrontNormale("Buono Offerta","Sconto xyz","mail cliente","All-In-One");
+                    printImage("oriz");
+                    usbCtrl.sendMsg("-", "GBK", dev);
+
+                    usbCtrl.sendMsg("Consegna questo buono per avere uno sconto", "GBK", dev);
+                    usbCtrl.sendByte(const_escpos.getBarreStampoBarre(), dev);
+                    usbCtrl.sendByte("8001435500013".getBytes(), dev);
+                    usbCtrl.sendByte(const_escpos.getInit(), dev);
+                    usbCtrl.sendMsg("valido fino al gg/mm/aaaa\n", "GBK", dev);
+                    usbCtrl.sendByte(const_escpos.getTaglioCarta(), dev);
+
+
+                }
+
+            }
+        });
+        //loginButton.callOnClick();
 
 
 /*
@@ -297,6 +501,10 @@ public class MainActivity extends AppCompatActivity implements Observer {
 
 
     }
+
+
+
+
     // Create a BroadcastReceiver for ACTION_FOUND.
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -339,13 +547,13 @@ public class MainActivity extends AppCompatActivity implements Observer {
 
 
             if (gpio.getName().toString().contains("BCM21".toString())){
-                testobtn1.setText("pulsante Premuto...");
                 t1.speak("Gastronomia serviamo il numero", TextToSpeech.QUEUE_FLUSH, null,null);
 
 
             }
 
             if (gpio.getName().toString().contains("BCM20".toString())){
+                Log.i(TAG, "Stampo etichetta");
                 if( CheckUsbPermission() == true ) {
 
                 usbCtrl.sendMsg("D'ITALY", "GBK", dev);
@@ -361,26 +569,22 @@ public class MainActivity extends AppCompatActivity implements Observer {
                 usbCtrl.sendByte(const_escpos.getInit(), dev);
                 usbCtrl.sendMsg("gg/mm/aaaa\n", "GBK", dev);
                 usbCtrl.sendByte(const_escpos.getTaglioCarta(), dev);
-
-
-                    usbCtrl.sendMsg("D'ITALY", "GBK", dev);
-                    //usbCtrl.sendMsg("Codice: 808080 e altre cose non per il cliente\n","GBK", dev);
-                    usbCtrl.sendByte(const_escpos.getInit(), dev);
-                    const_escpos.getFrontNormale("D'Italy  GASTRONOMIA                                                 ",
-                            "Num 1", "http://www.ditaly.it/", "seguici su");// "DItalyTower.it","GASTRON");
-                    printImage("oriz");
-                    usbCtrl.sendMsg(" ", "GBK", dev);
-                    usbCtrl.sendByte(const_escpos.getInitStampoBarre(), dev);
-                    usbCtrl.sendByte(const_escpos.getBarreStampoBarre(), dev);
-                    usbCtrl.sendByte("8001435500013".getBytes(), dev);
-                    usbCtrl.sendByte(const_escpos.getInit(), dev);
-                    usbCtrl.sendMsg("gg/mm/aaaa\n", "GBK", dev);
-                    usbCtrl.sendByte(const_escpos.getTaglioCarta(), dev);
+                usbCtrl.sendMsg("D'ITALY", "GBK", dev);
+                //usbCtrl.sendMsg("Codice: 808080 e altre cose non per il cliente\n","GBK", dev);
+                usbCtrl.sendByte(const_escpos.getInit(), dev);
+                const_escpos.getFrontNormale("D'Italy  GASTRONOMIA                                                 ",
+                        "Num 1", "http://www.ditaly.it/", "seguici su");// "DItalyTower.it","GASTRON");
+                printImage("oriz");
+                usbCtrl.sendMsg(" ", "GBK", dev);
+                usbCtrl.sendByte(const_escpos.getInitStampoBarre(), dev);
+                usbCtrl.sendByte(const_escpos.getBarreStampoBarre(), dev);
+                usbCtrl.sendByte("8001435500013".getBytes(), dev);
+                usbCtrl.sendByte(const_escpos.getInit(), dev);
+                usbCtrl.sendMsg("gg/mm/aaaa\n", "GBK", dev);
+                usbCtrl.sendByte(const_escpos.getTaglioCarta(), dev);
 
 
                 }
-
-
             }
             /*MyDataModel dataModel=MyDataModel.getInstance();
             List<String> lista = dataModel.getlista();
@@ -464,11 +668,20 @@ public class MainActivity extends AppCompatActivity implements Observer {
         }
     };
     @Override
+    protected void onResume(){
+        super.onResume();
+
+    }
+
+    @Override
     protected void onStart(){
         super.onStart();
 
-        startService(new Intent(getApplicationContext(), AService.class));
-        Log.i("service","START");
+        Log.i(TAG,"START");
+
+        ImageView immage = (ImageView) findViewById(R.id.foto);
+        immage.setVisibility(View.INVISIBLE);
+
 
        /* new Thread(new Runnable() {
             public void run() {
@@ -625,26 +838,79 @@ public class MainActivity extends AppCompatActivity implements Observer {
 
     @Override
     public void update(Observable observable, Object o) {
-        Log.i("service","Observer");
+        Log.i(TAG,"Observer");
         MyDataModel dataModel=MyDataModel.getInstance();
         final List<String> lista = dataModel.getlista();
 
         if (lista.size()>0) {
             runOnUiThread(new Runnable() {
                 public void run() {
-                    testobtn1.setText("pulsante Premuto...");
+
+                    TextView fbc = (TextView)findViewById(R.id.txtLike);
+                    fbc.setText(fbCount);
+                    ImageView fbI = (ImageView)findViewById(R.id.imageView3);
+                    if (fbCount.length() == 0){
+                        fbI.setVisibility(View.INVISIBLE);
+                    } else fbI.setVisibility(View.VISIBLE);
+                    Display display = getWindowManager().getDefaultDisplay();
+                    Point size = new Point();
+                    display.getSize(size);
+                    int width = size.x;
+                    //int height = size.y;
+
                     Log.i(TAG, intSetphoto + " GPIO changed, button pressed.size:" + lista.size());
                     if (intSetphoto > lista.size() - 1) {
                         intSetphoto = 0;
+                        //aggiorno pure facebook
                     }
 
                     Log.i(TAG, "GPIO changed, button pressed.photo:" + intSetphoto);
                     Log.i(TAG, "lista" + getBaseContext().getCacheDir() + "/" + lista.get(intSetphoto));
-                    ImageView img = (ImageView) findViewById(R.id.imageView2);
-                    Bitmap bMap = BitmapFactory.decodeFile(getBaseContext().getCacheDir() + "/" + lista.get(intSetphoto));
-                    img.setImageBitmap(bMap);
-                    Animation animationL = AnimationUtils.loadAnimation(getApplicationContext(),R.anim.left);
-                    img.startAnimation(animationL);
+                    final ImageView img = (ImageView) findViewById(R.id.foto);
+                    img.setVisibility(View.VISIBLE);
+                    final Bitmap bMap = BitmapFactory.decodeFile(getBaseContext().getCacheDir() + "/" + lista.get(intSetphoto));
+                    //Animation animationL = AnimationUtils.loadAnimation(getApplicationContext(),R.anim.card_flip_left_out);
+                    //img.startAnimation(animationL);
+                    //img.setImageBitmap(bMap);
+                    width = (width/2)-(bMap.getWidth()/2);
+                    ObjectAnimator animStage1 = new ObjectAnimator();//(ObjectAnimator) AnimatorInflater.loadAnimator(getApplicationContext(), R.animator.flipstage2);
+                    final ObjectAnimator animStage2 = new ObjectAnimator();//(ObjectAnimator) AnimatorInflater.loadAnimator(getApplicationContext(), R.animator.flipstage1);
+                    animStage1.setTarget(img);
+                    //animation = new ObjectAnimator();
+                    animStage1.setPropertyName("X");
+                    animStage1.setFloatValues(width, 2000);
+                    //animation.setRepeatMode(ValueAnimator.REVERSE);
+                    //animation.setRepeatCount(ValueAnimator.INFINITE);
+                    animStage1.setDuration(1000);
+                    animStage1.start();
+                    final int finalWidth = width;
+                    animStage1.addListener(new Animator.AnimatorListener() {
+                        @Override
+                        public void onAnimationStart(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            animStage2.setFloatValues(-2000, finalWidth);
+                            animStage2.setPropertyName("X");
+                            animStage2.setDuration(1000);
+                            animStage2.setTarget(img);
+                            animStage2.start();
+                            img.setImageBitmap(bMap);
+                        }
+
+                        @Override
+                        public void onAnimationCancel(Animator animation) {
+
+                        }
+
+                        @Override
+                        public void onAnimationRepeat(Animator animation) {
+
+                        }
+                    });
+
 
 
                     intSetphoto++;
@@ -697,7 +963,7 @@ public class MainActivity extends AppCompatActivity implements Observer {
 
     private void printImage(String NomeFile) {
         byte[] sendData = null;
-        String path = Environment.getExternalStorageDirectory() + "/";
+        //String path = getBaseContext().getCacheDir() ;
         //File fileD = new File(path);
         //fileD.mkdirs();
 
@@ -705,7 +971,7 @@ public class MainActivity extends AppCompatActivity implements Observer {
         int i = 0,s = 0,j = 0,index = 0,lines = 0;
         pg.initCanvas(580);
         pg.initPaint();
-        pg.drawImage(0,0, path+ "/"+NomeFile+".png");
+        pg.drawImage(0,0, Environment.getExternalStorageDirectory()+ "/"+NomeFile+".png");
         sendData = pg.printDraw();
         byte[] temp = new byte[(pg.getWidth() / 8)*5];
         byte[] dHeader = new byte[8];

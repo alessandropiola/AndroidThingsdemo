@@ -15,7 +15,8 @@ package demo.things.ap.it.Demo;
 
         import java.io.IOException;
 
-        import static com.google.android.gms.internal.zzs.TAG;
+        import static android.content.ContentValues.TAG;
+
 
 /**
  * Port of Arduino's LedControl library

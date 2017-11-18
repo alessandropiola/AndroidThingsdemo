@@ -153,6 +153,8 @@ public class const_escpos {
         FileOutputStream fos = null;
         try
         {
+
+
             fos = new FileOutputStream(Environment.getExternalStorageDirectory() + "/"+"oriz.png");
             bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
 
